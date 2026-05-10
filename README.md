@@ -1,6 +1,6 @@
 # /unsocial bot
 
-a custom discord bot made for the /unsocial server.
+a custom discord bot made for the /unsocial discord server.
 
 ## features
 - welcome & goodbye messages
