@@ -444,14 +444,27 @@ client.on('interactionCreate', async (interaction) => {
   if (customId === 'verify_member') {
     const member = interaction.member;
     try {
-      await member.roles.add(VERIFIED_ROLE_ID).catch(() => {});
-      await member.roles.remove(UNVERIFIED_ROLE_ID).catch(() => {});
-      return interaction.reply({
+      await interaction.deferReply({ ephemeral: true });
+
+      const verifiedRole   = interaction.guild.roles.cache.get(VERIFIED_ROLE_ID);
+      const unverifiedRole = interaction.guild.roles.cache.get(UNVERIFIED_ROLE_ID);
+
+      if (!verifiedRole)   return interaction.editReply({ content: '❌ Verified role not found. Please contact staff.' });
+      if (!unverifiedRole) return interaction.editReply({ content: '❌ Unverified role not found. Please contact staff.' });
+
+      if (member.roles.cache.has(VERIFIED_ROLE_ID)) {
+        return interaction.editReply({ content: '✅ You are already verified!' });
+      }
+
+      await member.roles.add(verifiedRole);
+      await member.roles.remove(unverifiedRole).catch(() => {});
+
+      return interaction.editReply({
         embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ you've been verified! welcome to **${SERVER_NAME}** ♡`)],
-        ephemeral: true,
       });
-    } catch {
-      return interaction.reply({ content: '❌ Something went wrong. Please contact staff.', ephemeral: true });
+    } catch (err) {
+      console.error('Verify error:', err);
+      return interaction.editReply({ content: `❌ Failed to verify: ${err.message}. Please contact staff.` });
     }
   }
 
