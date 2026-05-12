@@ -56,7 +56,7 @@ const PING_REPLIES = {
   '1344390615575560356': 'miku miku beam ✨',
   '1430173077756448778': 'bulb 💡',
   '1427983102583509002': 'go touch grass bestie 🌱',
-  '1316401543636848642': 'the council has been notified 🕵️',
+  '1316401543636848642': 'send a GTR first, then maybe she\'ll reply!',
 };
 
 const STAFF_ROLE_IDS  = [MOD_ROLE_ID, COOWNER_ROLE_ID, OWNER_ROLE_ID].filter(Boolean);
@@ -102,6 +102,9 @@ let warningData    = loadData('warnings.json');
 let reminderData   = loadData('reminders.json');
 let starsData      = loadData('stars.json');
 let botWhitelist   = loadList('botwhitelist.json');
+let trustedUsers   = loadList('trusted.json');
+let notesData      = loadData('notes.json');
+let confessionCount = loadData('confessions.json');
 
 // ─── XP ───────────────────────────────────────────────────────────────────────
 const xpCooldowns = new Map();
@@ -155,6 +158,18 @@ function addWarning(guildId, userId, reason, moderator) {
 function clearWarnings(guildId, userId) {
   if (warningData[guildId]) warningData[guildId][userId] = [];
   saveData('warnings.json', warningData);
+}
+
+// ─── Notes ────────────────────────────────────────────────────────────────────
+function addNote(guildId, userId, note, staffTag) {
+  if (!notesData[guildId]) notesData[guildId] = {};
+  if (!notesData[guildId][userId]) notesData[guildId][userId] = [];
+  notesData[guildId][userId].push({ note, staffTag, date: new Date().toISOString() });
+  saveData('notes.json', notesData);
+}
+function getNotes(guildId, userId) {
+  if (!notesData[guildId]) return [];
+  return notesData[guildId][userId] || [];
 }
 
 // ─── Reminders ────────────────────────────────────────────────────────────────
@@ -223,25 +238,30 @@ async function checkRaid(member) {
     return;
   }
 
-  // Ban accounts under 1 day old
+  // Flag accounts under 7 days (skip if trusted)
   const ageDays = (Date.now() - member.user.createdTimestamp) / 86400000;
-  if (ageDays < 1) {
-    await guild.members.ban(member.id, { reason: 'Auto-mod: account too new' }).catch(() => {});
-    const alertCh = guild.channels.cache.get(ALERT_CHANNEL_ID);
-    if (alertCh) alertCh.send({
-      embeds: [new EmbedBuilder().setColor(0xED4245).setTitle('🚫 Brand New Account Banned')
-        .setDescription(`**${member.user.tag}** was banned — account was only **${Math.floor(ageDays * 24)} hours** old.`).setTimestamp()],
-    });
-    return;
-  }
 
-  // Flag accounts under 7 days
-  if (ageDays < 7) {
-    const alertCh = guild.channels.cache.get(ALERT_CHANNEL_ID);
-    if (alertCh) alertCh.send({
-      embeds: [new EmbedBuilder().setColor(0xFEE75C).setTitle('⚠️ Potential Alt Account')
-        .setDescription(`**${member.user.tag}** joined with an account only **${Math.floor(ageDays)} days** old.\n> <@${member.id}>\n> created: <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`).setTimestamp()],
-    });
+  if (trustedUsers.includes(member.user.id)) {
+    console.log(`✅ Trusted user ${member.user.tag} joined — skipping age checks.`);
+  } else {
+    // Ban accounts under 1 day old
+    if (ageDays < 1) {
+      await guild.members.ban(member.id, { reason: 'Auto-mod: account too new' }).catch(() => {});
+      const alertCh = guild.channels.cache.get(ALERT_CHANNEL_ID);
+      if (alertCh) alertCh.send({
+        embeds: [new EmbedBuilder().setColor(0xED4245).setTitle('🚫 Brand New Account Banned')
+          .setDescription(`**${member.user.tag}** was banned — account was only **${Math.floor(ageDays * 24)} hours** old.`).setTimestamp()],
+      });
+      return;
+    }
+    // Flag accounts under 7 days
+    if (ageDays < 7) {
+      const alertCh = guild.channels.cache.get(ALERT_CHANNEL_ID);
+      if (alertCh) alertCh.send({
+        embeds: [new EmbedBuilder().setColor(0xFEE75C).setTitle('⚠️ Potential Alt Account')
+          .setDescription(`**${member.user.tag}** joined with an account only **${Math.floor(ageDays)} days** old.\n> <@${member.id}>\n> created: <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`).setTimestamp()],
+      });
+    }
   }
 
   // Mass join detection
@@ -585,8 +605,8 @@ client.on('messageCreate', async (message) => {
     return message.reply({
       embeds: [new EmbedBuilder().setColor(0x2b2d31).setTitle(`${SERVER_NAME} — commands ✦`)
         .addFields(
-          { name: '📋 general',            value: '`,ping` `,rank [@user]` `,leaderboard` `,profile [@user]` `,avatar [@user]` `,userinfo [@user]` `,serverinfo` `,suggest <idea>` `,remindme <time> <msg>` `,reminders` `,ticket` `,stars [@user]` `,confess <message>`' },
-          { name: '🔨 moderation (staff)', value: '`,kick` `,ban` `,unban <id>` `,mute @user <mins>` `,unmute` `,warn` `,warnings` `,clearwarnings` `,addstars @user <n>` `,removestars @user <n>` `,purge <1-100>` `,announce <msg>` `,lockdown` `,unlockdown` `,addrole @role` `,removerole @role` `,addbot <id>` `,removebot <id>` `,setup`' },
+          { name: '📋 general',            value: '`,ping` `,rank [@user]` `,leaderboard` `,profile [@user]` `,avatar [@user]` `,userinfo [@user]` `,serverinfo` `,suggest <idea>` `,remindme <time> <msg>` `,reminders` `,ticket` `,stars [@user]` `,confess <msg>`' },
+          { name: '🔨 moderation (staff)', value: '`,kick` `,ban` `,unban <id>` `,mute @user <mins>` `,unmute` `,warn` `,warnings` `,clearwarnings` `,note @user <note>` `,notes @user` `,addstars` `,removestars` `,giverole @user @role` `,takerole @user @role` `,roleall @role` `,unroleall @role` `,nickname @user <name>` `,slowmode <secs>` `,purge <1-100>` `,announce <msg>` `,lockdown` `,unlockdown` `,addbot <id>` `,removebot <id>` `,addtrusted <id>` `,removetrusted <id>` `,listtrusted` `,setup`' },
         ).setFooter({ text: `${SERVER_NAME} ♡ | prefix: ,` })],
     });
   }
@@ -716,11 +736,15 @@ client.on('messageCreate', async (message) => {
     const confCh = message.guild.channels.cache.get(CONFESSION_CHANNEL_ID);
     if (!confCh) return message.reply('❌ confession channel not found.');
     await message.delete().catch(() => {});
+    if (!confessionCount[message.guild.id]) confessionCount[message.guild.id] = 0;
+    confessionCount[message.guild.id]++;
+    saveData('confessions.json', confessionCount);
+    const num = confessionCount[message.guild.id];
     await confCh.send({
-      embeds: [new EmbedBuilder().setColor(0x2b2d31).setTitle('🤫 anonymous confession')
+      embeds: [new EmbedBuilder().setColor(0x2b2d31).setTitle(`🤫 anonymous confession #${num}`)
         .setDescription(confession).setFooter({ text: `${SERVER_NAME} confessions ♡` }).setTimestamp()],
     });
-    return message.author.send({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription('✅ your confession was posted anonymously ♡')] }).catch(() => {});
+    return message.author.send({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ your confession #${num} was posted anonymously ♡`)] }).catch(() => {});
   }
 
   if (command === 'ticket') {
@@ -746,7 +770,7 @@ client.on('messageCreate', async (message) => {
     if (botWhitelist.includes(botId)) return message.reply('✅ that bot is already whitelisted.');
     botWhitelist.push(botId);
     saveData('botwhitelist.json', botWhitelist);
-    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ bot \`${botId}\` added to the whitelist. you can now invite it safely ♡`)] });
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ bot \`${botId}\` added to the whitelist ♡`)] });
   }
 
   if (command === 'removebot') {
@@ -755,6 +779,80 @@ client.on('messageCreate', async (message) => {
     botWhitelist = botWhitelist.filter(id => id !== botId);
     saveData('botwhitelist.json', botWhitelist);
     return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ bot \`${botId}\` removed from the whitelist.`)] });
+  }
+
+  // Trusted users (bypass alt account age ban)
+  if (command === 'addtrusted') {
+    const userId = args[0];
+    if (!userId) return message.reply('❌ usage: `,addtrusted <user_id>`');
+    if (trustedUsers.includes(userId)) return message.reply('✅ that user is already trusted.');
+    trustedUsers.push(userId);
+    saveData('trusted.json', trustedUsers);
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ user \`${userId}\` is now trusted — they can join even with a new account ♡`)] });
+  }
+
+  if (command === 'removetrusted') {
+    const userId = args[0];
+    if (!userId) return message.reply('❌ usage: `,removetrusted <user_id>`');
+    trustedUsers = trustedUsers.filter(id => id !== userId);
+    saveData('trusted.json', trustedUsers);
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ user \`${userId}\` removed from trusted list.`)] });
+  }
+
+  if (command === 'listtrusted') {
+    if (!trustedUsers.length) return message.reply('no trusted users added yet.');
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setTitle('trusted users').setDescription(trustedUsers.map((id, i) => `**${i + 1}.** \`${id}\``).join('\n')).setFooter({ text: `${SERVER_NAME} ♡` })] });
+  }
+
+  // Give/take role from a specific person
+  if (command === 'giverole') {
+    const target = message.mentions.members.first();
+    const role   = message.mentions.roles.first();
+    if (!target || !role) return message.reply('❌ usage: `,giverole @user @role`');
+    await target.roles.add(role).catch(() => {});
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ gave **${role.name}** to **${target.user.tag}** ♡`)] });
+  }
+
+  if (command === 'takerole') {
+    const target = message.mentions.members.first();
+    const role   = message.mentions.roles.first();
+    if (!target || !role) return message.reply('❌ usage: `,takerole @user @role`');
+    await target.roles.remove(role).catch(() => {});
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ removed **${role.name}** from **${target.user.tag}** ♡`)] });
+  }
+
+  // Nickname
+  if (command === 'nickname' || command === 'nick') {
+    const target   = message.mentions.members.first();
+    const nickname = args.slice(1).join(' ') || null;
+    if (!target) return message.reply('❌ usage: `,nickname @user <new nickname>` — leave nickname blank to reset');
+    await target.setNickname(nickname).catch(() => {});
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(nickname ? `✅ set **${target.user.tag}**'s nickname to **${nickname}** ♡` : `✅ reset **${target.user.tag}**'s nickname ♡`)] });
+  }
+
+  // Slowmode
+  if (command === 'slowmode') {
+    const seconds = parseInt(args[0]);
+    if (isNaN(seconds) || seconds < 0 || seconds > 21600) return message.reply('❌ provide seconds between 0 and 21600. use 0 to disable.');
+    await message.channel.setRateLimitPerUser(seconds);
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(seconds === 0 ? '✅ slowmode disabled ♡' : `✅ slowmode set to **${seconds}s** ♡`)] });
+  }
+
+  // Notes
+  if (command === 'note') {
+    const target = message.mentions.members.first();
+    const note   = args.slice(1).join(' ');
+    if (!target || !note) return message.reply('❌ usage: `,note @user <note>`');
+    addNote(message.guild.id, target.id, note, message.author.tag);
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ note saved for **${target.user.tag}** ♡`)] });
+  }
+
+  if (command === 'notes') {
+    const target = message.mentions.members.first() || message.member;
+    const notes  = getNotes(message.guild.id, target.id);
+    if (!notes.length) return message.reply(`no notes found for **${target.user.tag}**.`);
+    const list = notes.map((n, i) => `**${i + 1}.** ${n.note} — by ${n.staffTag} <t:${Math.floor(new Date(n.date).getTime() / 1000)}:R>`).join('\n');
+    return message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setTitle(`notes for ${target.user.username}`).setDescription(list).setFooter({ text: `total: ${notes.length}` })] });
   }
 
   if (command === 'addstars') {
@@ -833,9 +931,9 @@ client.on('messageCreate', async (message) => {
     return message.channel.send({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription('🔓 server unlocked ♡').setTimestamp()] });
   }
 
-  if (command === 'addrole') {
+  if (command === 'roleall') {
     const role = message.mentions.roles.first();
-    if (!role) return message.reply('❌ please mention a role. e.g. `,addrole @rolename`');
+    if (!role) return message.reply('❌ please mention a role. e.g. `,roleall @rolename`');
     const msg = await message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`⏳ adding **${role.name}** to all members... this may take a while ♡`)] });
     const members = await message.guild.members.fetch();
     let count = 0;
@@ -843,9 +941,9 @@ client.on('messageCreate', async (message) => {
     return msg.edit({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`✅ added **${role.name}** to **${count}** members ♡`)] });
   }
 
-  if (command === 'removerole') {
+  if (command === 'unroleall') {
     const role = message.mentions.roles.first();
-    if (!role) return message.reply('❌ please mention a role. e.g. `,removerole @rolename`');
+    if (!role) return message.reply('❌ please mention a role. e.g. `,unroleall @rolename`');
     const msg = await message.reply({ embeds: [new EmbedBuilder().setColor(0x2b2d31).setDescription(`⏳ removing **${role.name}** from all members... this may take a while ♡`)] });
     const members = await message.guild.members.fetch();
     let count = 0;
