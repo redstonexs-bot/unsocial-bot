@@ -559,10 +559,12 @@ client.on('messageDelete', async (message) => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) return;
 
-  // Custom ping replies for specific users
-  for (const [userId, reply] of Object.entries(PING_REPLIES)) {
-    if (message.content.includes(`<@${userId}>`)) {
-      return message.reply(reply);
+  // Custom ping replies — only fire if not a bot command
+  if (!message.content.startsWith(PREFIX)) {
+    for (const [userId, reply] of Object.entries(PING_REPLIES)) {
+      if (message.content.includes(`<@${userId}>`)) {
+        return message.reply(reply);
+      }
     }
   }
 
