@@ -54,8 +54,8 @@ const CONFESSION_CHANNEL_ID  = '1489957438978396180';
 const PING_REPLIES = {
   '1323308066523058239': 'You can do it yourself.',
   '1344390615575560356': 'miku miku beam ✨',
-  '1430173077756448778': 'bulb 💡',
-  '1427983102583509002': 'go touch grass bestie 🌱',
+  '1430173077756448778': 'bulb',
+  '1427983102583509002': 'go touch grass bestie',
   '1316401543636848642': 'send a GTR first, then maybe she\'ll reply!',
 };
 
